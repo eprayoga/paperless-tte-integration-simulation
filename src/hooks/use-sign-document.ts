@@ -5,6 +5,7 @@ import { toast } from "sonner"
 
 import { SIGN_MESSAGES } from "@/constants/document"
 import { toApiError } from "@/lib/api-error"
+import type { SignV2FormValues } from "@/schemas/document.schema"
 import { fileToBase64 } from "@/lib/file"
 import {
   toSignResultPatch,
@@ -25,6 +26,7 @@ type SignParams = {
   method: SignMethod
   /** The re-attached PDF, already verified against document.fileHash. */
   file: File
+  v2Details?: SignV2FormValues
 }
 
 /**
@@ -35,7 +37,7 @@ export function useSignDocument() {
   const markSubmitted = useDocumentStore((state) => state.markSubmitted)
 
   return useCallback(
-    async ({ document, method, file }: SignParams): Promise<boolean> => {
+    async ({ document, method, file, v2Details }: SignParams): Promise<boolean> => {
       const { startAction, endAction } = useUiStore.getState()
       if (!startAction(document.id, "signing")) return false
 
@@ -47,7 +49,16 @@ export function useSignDocument() {
         if (method === "v1") {
           result = await paperlessService.signV1(toSignV1Payload(document, fileBase64))
         } else if (method === "v2") {
-          result = await paperlessService.signV2(toSignV2Payload(document, fileBase64))
+          if (!v2Details) {
+            toast.error(SIGN_MESSAGES.failed, {
+              id: toastId,
+              description: "Reason dan location wajib diisi untuk TTE V2.",
+            })
+            return false
+          }
+          result = await paperlessService.signV2(
+            toSignV2Payload({ ...document, ...v2Details }, fileBase64),
+          )
         } else {
           const template = getUsableTemplate(
             useTemplateStore.getState().templates,
@@ -66,7 +77,7 @@ export function useSignDocument() {
           )
         }
 
-        markSubmitted(document.id, toSignResultPatch(result, method))
+        markSubmitted(document.id, { ...toSignResultPatch(result, method), ...v2Details })
         toast.success(SIGN_MESSAGES.success, {
           id: toastId,
           description: `Transaction ID: ${result.trx_id}`,

@@ -273,7 +273,7 @@ function TemplateEditorForm({
                 "Drag elemen untuk memindahkan. Tarik sudut signature/QR untuk mengubah ukuran."}
             </CardDescription>
           </CardHeader>
-          <CardContent className="bg-muted/40 mx-4 rounded-lg p-3 sm:mx-6">
+          <CardContent className="bg-muted/40 mx-4 rounded-lg p-0 sm:mx-6">
             <EditorCanvas
               file={file}
               pageNumber={currentPage}

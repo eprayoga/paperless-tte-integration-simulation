@@ -65,8 +65,6 @@ export function DocumentForm({ document }: DocumentFormProps) {
       title: document?.title ?? "",
       regNumber: document?.regNumber ?? "",
       keyDoc: document?.keyDoc ?? "",
-      reason: document?.reason ?? "",
-      location: document?.location ?? "",
       file: undefined,
     },
   })
@@ -97,8 +95,8 @@ export function DocumentForm({ document }: DocumentFormProps) {
         title: values.title,
         regNumber: values.regNumber,
         keyDoc: values.keyDoc,
-        reason: values.reason || undefined,
-        location: values.location || undefined,
+        reason: document?.reason,
+        location: document?.location,
         ...fileMeta,
       }
 
@@ -130,8 +128,8 @@ export function DocumentForm({ document }: DocumentFormProps) {
         <CardHeader>
           <CardTitle>{isEdit ? "Edit Document" : "Document Information"}</CardTitle>
           <CardDescription>
-            Data ini dipakai sebagai payload TTE Paperless (title, regNumber, key_doc, reason,
-            location, file).
+            Data ini dipakai sebagai payload TTE Paperless (title, regNumber, key_doc, file).
+            Reason dan location diisi saat TTE V2.
           </CardDescription>
         </CardHeader>
 
@@ -171,34 +169,6 @@ export function DocumentForm({ document }: DocumentFormProps) {
                 />
                 <FieldDescription>Dikirim sebagai key_doc.</FieldDescription>
                 <FieldError errors={[errors.keyDoc]} />
-              </Field>
-            </div>
-
-            <div className="grid gap-6 md:grid-cols-2">
-              <Field data-invalid={!!errors.reason}>
-                <FieldLabel htmlFor="reason">Reason</FieldLabel>
-                <Input
-                  id="reason"
-                  placeholder="Persetujuan dokumen"
-                  aria-invalid={!!errors.reason}
-                  {...form.register("reason")}
-                />
-                <FieldDescription>Wajib untuk V2; default reason untuk V2 Custom.</FieldDescription>
-                <FieldError errors={[errors.reason]} />
-              </Field>
-
-              <Field data-invalid={!!errors.location}>
-                <FieldLabel htmlFor="location">Location</FieldLabel>
-                <Input
-                  id="location"
-                  placeholder="Bandung"
-                  aria-invalid={!!errors.location}
-                  {...form.register("location")}
-                />
-                <FieldDescription>
-                  Wajib untuk V2; default location untuk V2 Custom.
-                </FieldDescription>
-                <FieldError errors={[errors.location]} />
               </Field>
             </div>
 

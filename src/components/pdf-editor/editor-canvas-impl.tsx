@@ -234,7 +234,6 @@ export default function EditorCanvasImpl({
 }: EditorCanvasProps) {
   const { ref, width: containerWidth } = useElementWidth<HTMLDivElement>()
   const [page, setPage] = useState<LoadedPage | null>(null)
-  // Leave room for the page border so "fit width" never overflows horizontally.
   const renderWidth = Math.max(200, Math.floor(containerWidth * zoom) - 4)
 
   const viewport = useMemo(() => {
@@ -254,7 +253,7 @@ export default function EditorCanvasImpl({
   const textVisible = text.show && text.page === pageNumber
 
   return (
-    <div ref={ref} className="w-full overflow-auto">
+    <div ref={ref} className="w-full overflow-auto p-3 [scrollbar-gutter:stable]">
       {containerWidth > 0 && (
         <Document
           file={file}

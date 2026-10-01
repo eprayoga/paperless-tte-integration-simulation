@@ -22,9 +22,6 @@ const pdfFileSchema = z
     message: `Ukuran file maksimal ${formatFileSize(MAX_PDF_SIZE_BYTES)}.`,
   })
 
-const optionalText = (max: number) =>
-  z.string().trim().max(max, `Maksimal ${max} karakter.`).optional().or(z.literal(""))
-
 const baseDocumentSchema = z.object({
   title: z.string().trim().min(1, "Title wajib diisi.").max(200, "Maksimal 200 karakter."),
   regNumber: z
@@ -33,10 +30,15 @@ const baseDocumentSchema = z.object({
     .min(1, "Registration number wajib diisi.")
     .max(100, "Maksimal 100 karakter."),
   keyDoc: z.string().trim().min(1, "Key document wajib diisi.").max(200, "Maksimal 200 karakter."),
-  reason: optionalText(200),
-  location: optionalText(200),
   file: pdfFileSchema.optional(),
 })
+
+export const signV2Schema = z.object({
+  reason: z.string().trim().min(1, "Reason wajib diisi.").max(200, "Maksimal 200 karakter."),
+  location: z.string().trim().min(1, "Location wajib diisi.").max(200, "Maksimal 200 karakter."),
+})
+
+export type SignV2FormValues = z.infer<typeof signV2Schema>
 
 export type DocumentFormValues = z.input<typeof baseDocumentSchema>
 export type DocumentFormOutput = z.output<typeof baseDocumentSchema>

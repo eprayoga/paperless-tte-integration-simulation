@@ -1,7 +1,10 @@
 "use client"
 
+import { zodResolver } from "@hookform/resolvers/zod"
 import { SealCheckIcon, WarningIcon } from "@phosphor-icons/react"
 import Link from "next/link"
+import { useEffect } from "react"
+import { useForm } from "react-hook-form"
 
 import { PdfAttachField } from "@/components/documents/pdf-attach-field"
 import { TemplateSummary } from "@/components/documents/template-summary"
@@ -15,11 +18,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Spinner } from "@/components/ui/spinner"
 import { ROUTES } from "@/constants/app"
 import { SIGN_MESSAGES, SIGN_METHOD_LABELS } from "@/constants/document"
 import { useSignDocument } from "@/hooks/use-sign-document"
+import { signV2Schema, type SignV2FormValues } from "@/schemas/document.schema"
 import { useSessionFileStore } from "@/stores/session-file.store"
 import { getUsableTemplate, useTemplateStore } from "@/stores/template.store"
 import { useUiStore } from "@/stores/ui.store"
@@ -33,7 +39,6 @@ type SignDialogProps = {
   onSigned?: (document: DocumentItem) => void
 }
 
-/** Confirmation step shown before every signing request. */
 export function SignDialog({ document, method, open, onOpenChange, onSigned }: SignDialogProps) {
   const signDocument = useSignDocument()
   const file = useSessionFileStore((state) => (document ? state.files[document.id] : undefined))
@@ -46,32 +51,46 @@ export function SignDialog({ document, method, open, onOpenChange, onSigned }: S
       : undefined,
   )
 
+  const v2Form = useForm<SignV2FormValues>({
+    resolver: zodResolver(signV2Schema),
+    mode: "onTouched",
+    defaultValues: { reason: "", location: "" },
+  })
+
+  useEffect(() => {
+    if (open && method === "v2") {
+      v2Form.reset({ reason: document?.reason ?? "", location: document?.location ?? "" })
+    }
+  }, [open, method, document?.id, document?.reason, document?.location, v2Form])
+
   if (!document || !method) return null
 
-  const missingV2Fields =
-    method === "v2" && (!document.reason?.trim() || !document.location?.trim())
+  const isV2 = method === "v2"
   const missingTemplate = method === "v2-custom" && !template
-  const canConfirm = !!file && !missingV2Fields && !missingTemplate && !isSigning
+  const canConfirm = !!file && !missingTemplate && !isSigning
+  const v2Errors = v2Form.formState.errors
 
-  async function handleConfirm() {
+  async function submit(v2Details?: SignV2FormValues) {
     if (!document || !method || !file) return
-    const ok = await signDocument({ document, method, file })
+    const ok = await signDocument({ document, method, file, v2Details })
     if (ok) {
       onOpenChange(false)
       onSigned?.(document)
     }
   }
 
+  function handleConfirm() {
+    if (isV2) {
+      void v2Form.handleSubmit((values) => submit(values))()
+      return
+    }
+    void submit()
+  }
+
   const details = [
     { label: "Document", value: document.title },
     { label: "Registration Number", value: document.regNumber },
     { label: "Signing Method", value: SIGN_METHOD_LABELS[method] },
-    ...(method === "v2"
-      ? [
-          { label: "Reason", value: document.reason || "-" },
-          { label: "Location", value: document.location || "-" },
-        ]
-      : []),
   ]
 
   return (
@@ -98,6 +117,33 @@ export function SignDialog({ document, method, open, onOpenChange, onSigned }: S
           ))}
         </dl>
 
+        {isV2 && (
+          <FieldGroup className="gap-4">
+            <Field data-invalid={!!v2Errors.reason}>
+              <FieldLabel htmlFor="sign-v2-reason">Reason *</FieldLabel>
+              <Input
+                id="sign-v2-reason"
+                placeholder="Persetujuan dokumen"
+                disabled={isSigning}
+                aria-invalid={!!v2Errors.reason}
+                {...v2Form.register("reason")}
+              />
+              <FieldError errors={[v2Errors.reason]} />
+            </Field>
+            <Field data-invalid={!!v2Errors.location}>
+              <FieldLabel htmlFor="sign-v2-location">Location *</FieldLabel>
+              <Input
+                id="sign-v2-location"
+                placeholder="Bandung"
+                disabled={isSigning}
+                aria-invalid={!!v2Errors.location}
+                {...v2Form.register("location")}
+              />
+              <FieldError errors={[v2Errors.location]} />
+            </Field>
+          </FieldGroup>
+        )}
+
         {method === "v2-custom" && template && (
           <div className="space-y-2">
             <p className="text-sm font-medium">Template V2 Custom</p>
@@ -118,19 +164,6 @@ export function SignDialog({ document, method, open, onOpenChange, onSigned }: S
           </Alert>
         )}
 
-        {missingV2Fields && (
-          <Alert variant="destructive">
-            <WarningIcon />
-            <AlertTitle>Reason dan Location wajib untuk V2</AlertTitle>
-            <AlertDescription>
-              Lengkapi data dokumen terlebih dahulu.
-              <Link className="underline" href={ROUTES.editDocument(document.id)}>
-                Edit dokumen
-              </Link>
-            </AlertDescription>
-          </Alert>
-        )}
-
         <Separator />
 
         <div className="space-y-2">
@@ -142,7 +175,7 @@ export function SignDialog({ document, method, open, onOpenChange, onSigned }: S
           <Button variant="outline" disabled={isSigning} onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button disabled={!canConfirm} onClick={() => void handleConfirm()}>
+          <Button disabled={!canConfirm} onClick={handleConfirm}>
             {isSigning ? <Spinner /> : <SealCheckIcon />}
             {isSigning ? "Signing..." : "Confirm Sign"}
           </Button>

@@ -47,7 +47,10 @@ export type DocumentInput = Pick<
 >
 
 /** Fields written after a successful sign request (trx_id + signer). */
-export type SignResultPatch = Pick<DocumentItem, "trxId" | "signerUuid" | "signerName"> & {
+export type SignResultPatch = Pick<
+  DocumentItem,
+  "trxId" | "signerUuid" | "signerName" | "reason" | "location"
+> & {
   signMethod: SignMethod
 }
 

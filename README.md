@@ -1,36 +1,75 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Paperless TTE Demo
 
-## Getting Started
+Website demo integrasi API **TTE Paperless**: OAuth, balance, tanda tangan elektronik V1, V2,
+V2 Custom (dengan editor koordinat PDF), cek status, dan hasil dokumen.
 
-First, run the development server:
+> Demo frontend, bukan aplikasi produksi. Dokumen dan template disimpan di `localStorage`
+> browser; file PDF tidak pernah disimpan.
+
+## Menjalankan
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env.local   # isi nilainya
+npm run dev                  # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Daftarkan `PAPERLESS_REDIRECT_PAGE` (default `http://localhost:3000/api/auth/callback`) sebagai
+redirect OAuth di Paperless.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Script              | Fungsi                                |
+| ------------------- | ------------------------------------- |
+| `npm run dev`       | Development server                    |
+| `npm run build`     | Production build                      |
+| `npm run typecheck` | Generate route types + `tsc --noEmit` |
+| `npm run lint`      | ESLint                                |
+| `npm test`          | Unit test (Vitest)                    |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Keamanan
 
-## Learn More
+- Semua env bersifat **server-only**. `secret-key` dan `customer-key` ditambahkan oleh proxy
+  `src/app/api/paperless/[...path]/route.ts`; browser tidak pernah melihatnya.
+- Proxy hanya meneruskan 5 endpoint yang diizinkan (`src/lib/server/paperless-routes.ts`).
+- `ttetoken` disimpan sebagai cookie **httpOnly** (`/api/auth/callback`), lalu di-redirect 303
+  ke `/documents` sehingga token tidak tertinggal di URL dan tidak bisa dibaca JavaScript.
+- Setiap 401 (HTTP status maupun `status` di body) menghapus cookie dan mengarahkan ke `/login`.
 
-To learn more about Next.js, take a look at the following resources:
+## Alur
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```text
+/login -> /api/auth/login -> Paperless OAuth -> /api/auth/callback?ttetoken=...
+       -> validasi token (GET balance) -> cookie httpOnly -> /documents
+/documents: balance + tabel dokumen (localStorage)
+Draft -> TTE V1 / V2 (dialog konfirmasi + pilih ulang PDF)
+      -> TTE V2 Custom -> template editor -> preview wajib -> konfirmasi
+      -> trx_id -> Pending -> Check Status -> Success | Failed (Retry)
+Success: Preview / Download (URL diambil ulang dari status) / Verification
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Struktur
 
-## Deploy on Vercel
+```text
+src/
+├── app/                      # routes (App Router) + API routes (auth, proxy)
+├── components/
+│   ├── auth/ balance/ layout/ common/
+│   ├── documents/            # tabel, form, dialog sign/delete, detail
+│   ├── pdf/                  # viewer react-pdf (client-only)
+│   └── pdf-editor/           # editor template V2 Custom + preview
+├── services/                 # axios client, paperless service + mapper, auth
+├── stores/                   # Zustand: auth, document, template, balance, ui, session-file
+├── schemas/                  # Zod: document, template
+├── lib/                      # konversi koordinat, preview pdf-lib, util, server-only
+├── hooks/ types/ constants/
+└── proxy.ts                  # route guard (Next 16 "proxy", dulu middleware)
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Koordinat V2 Custom
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Semua koordinat yang disimpan dan dikirim memakai satuan point PDF dengan **origin (0,0) di kiri
+bawah**. Editor menampilkan halaman dengan pdf.js dan mengonversi posisi layar (origin kiri atas)
+memakai `viewport.transform` (`src/lib/pdf-coordinates.ts`), sehingga zoom dan rotasi halaman
+ikut diperhitungkan.
+
+Catatan: pada contoh payload API, `upper_left_x/upper_left_y` berisi sudut **kanan atas** kotak
+signature (431→535, 163→202). Nama property dipertahankan, nilainya diisi sudut kanan atas.
